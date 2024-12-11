@@ -12,7 +12,7 @@ PURE    =
 
 EXE     =
 #EXE    = .exe
-TARGET  = blif2bdd$(EXE)
+TARGET  = blif2bdd-order$(EXE)
 
 file = ../cudd_location
 WHERE   = $(shell cat ${file})

@@ -1,13 +1,11 @@
 ----------
   How to 
 ----------
-# file.blif must be under blif2bdd folder or else will cause error.
-# Use different reordering
-blif2bdd 1.blif
+I have three versions of main.c
 
-# Use ordering from a file
-blif2bdd -order 1.ord 1.blif
+1. replace the main.c with the ones in the folder (shuffling/sifting/simulated_annealing)
+2. type make
+3. ./bild2bdd-order c880.blif
 
-# Convert dot file to postscript file
-dotps 1.blif.dot
+(Sorry I should combine them together but I don't have time regarding 2 other finals.)
 

@@ -1,6 +1,10 @@
 /* Try version by zzeng */
 /* Boolean network */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
 #include "util.h"
 #include "cuddInt.h"
 #include "cudd.h"
@@ -31,6 +35,10 @@ static char buffer[BUFLENGTH];
 #ifdef DD_DEBUG
 extern st_table *checkMinterms ARGS ((BnetNetwork * net, DdManager * dd, st_table * previous));
 #endif
+
+#define MAX_TEMP 100.0 // Maximum temperature
+#define MIN_TEMP 0.01  // Minimum temperature
+#define COOLING_RATE 0.95 // Cooling factor
 
 
 static NtrOptions *mainInit ARGS (());
@@ -94,73 +102,151 @@ main (int argc, char **argv)
 	for (i = 0; i < net->ninputs; i++) { fprintf (stdout, "\n\t%s\n", PIs[i]);
 	}
 
-	/* Contruct the BDD structure */
-	/* Initialize manager. We start with 0 variables, because
-	   Ntr_buildDDs will create new variables rather than using
-	   whatever already exists.
-	   */
-	manager = startCudd (option, net->ninputs);
-	if (manager == NULL) {
-		exit (-1);
-	}
-
-	result = Ntr_buildDDs (net, manager, option, NULL);
-	if (result == 0) {
-		fprintf (stderr, "Cannot build DD from the BNetwork");
-		exit (-1);
-	}
-
-
-	/** Ordering **/
-	/* Show Cudd_reordering status */
-	//method = (Cudd_ReorderingType *) malloc( sizeof(Cudd_ReorderingType));
-	//reorder = CUDD_REORDER_SIFT;
-	// CUDD_REORDER_SIFT_CONVERGE;
-	//CUDD_REORDER_ANNEALING;
-	//Cudd_ReorderingStatus(manager, &method);
-	//fprintf(stdout, "\nBDD ordering method is: %d", method);
-
-	//Cudd_AutodynEnable( manager, reorder);
-	//
-	if (option->ordering != PI_PS_GIVEN)
-		DynamicReordering( manager);
-
-	/** Dump BDD **/
-	//fp = fopen("dump.dot", "w");
-	//result = Cudd_DumpDot( manager, net->npos,
-	//Bnet_bddDump (manager, net, "dump.dot.reorder", 0, 0);
-	//(void) fclose(fp);
-
-	fprintf (stdout, "\nOrdering before the DFS re-ordering.\n");
-	//   Bnet_PrintOrder( net, manager);
-	//  Bnet_DfsVariableOrder( manager, net);
-	// Bnet_PrintOrder( net, manager);
-	//Bnet_bddDump( manager, net, "dump1.dot", 0, 0);
-
-	/* Read ordering from file */
-	//   Bnet_ReadOrder( manager, "s27.ord", net, 1, 1); // 0: which kind of bdd 1:
-	strcat(string1, "");
-	strcat(string1, blif_file);
-	//fprintf (stdout,string1);
-	string1[strlen(string1)-1] = '\0'; // = '\0' only removes one char
-	string1[strlen(string1)-1] = '\0'; // = 0 removes 2 chars
-	string1[strlen(string1)-1] = '\0'; // the string length will change 
-	string1[strlen(string1)-1] = '\0'; 
-	string1[strlen(string1)-1] = '\0';
-	//string1[strlen(string1)-4] = 0;
-	//string1[strlen(string1)-5] = 0;
-	strcat(string1, ".add.dot");
-	//strcat(string1, ".dot");
 	
-	// ECE/CS 5740/6740 -- Counting BDD size (added 04/19/2021 by Cunxi Yu)
-        int mysize;
-	mysize = Cudd_ReadNodeCount(manager);
-        fprintf(stdout, "size: %8d\n", mysize);	
-	// ECE/CS 5740/6740 -- Counting BDD size (added 04/19/2021 by Cunxi Yu) end
-	Bnet_bddDump (manager, net, string1, 0, 0);
+
+    //TODO!! The construction of BDD starts here!!
+    // 1. change the option->orderPiPs
+    // number of inputs: net -> nInputs
+    // the input list: net -> inputs
+
+        /* Contruct the BDD structure */
+        /* Initialize manager. We start with 0 variables, because
+        Ntr_buildDDs will create new variables rather than using
+        whatever already exists.
+        */
+    
+	// Run the original order
+    manager = startCudd (option, net->ninputs);
+        if (manager == NULL) {
+            exit (-1);
+        }
+		//printf("checkpoint2\n");
+        result = Ntr_buildDDs (net, manager, option, NULL);
+        if (result == 0) {
+            fprintf (stderr, "Cannot build DD from the BNetwork");
+            exit (-1);
+        }
+		//printf("checkpoint3\n");
+        if (option->ordering != PI_PS_GIVEN)
+            DynamicReordering( manager);
+
+        // ECE/CS 5740/6740 -- Counting BDD size (added 04/19/2021 by Cunxi Yu)
+        int Orisize;
+        Orisize = Cudd_ReadNodeCount(manager);
+            fprintf(stdout, "size: %8d\n", Orisize);	
+        // ECE/CS 5740/6740 -- Counting BDD size (added 04/19/2021 by Cunxi Yu) end
+		//printf("checkpoint4\n");
+
+
+		//(void) Bnet_FreeNetwork (new_net);
+		(void) Cudd_Quit (manager);
+
+    // Original order end
+
+    // Function2 sifting
+    /* Simulated Annealing */
+    double temperature = MAX_TEMP;
+    char **current_order = malloc(net->ninputs * sizeof(char *));
+    char **best_order = malloc(net->ninputs * sizeof(char *));
+    int best_size = Orisize;
+
+    for (int i = 0; i < net->ninputs; i++) {
+        current_order[i] = net->inputs[i];
+        best_order[i] = net->inputs[i];
+    }
+
+    while (temperature > MIN_TEMP) {
+        /* Generate a neighbor by swapping two inputs */
+        int idx1 = rand() % net->ninputs;
+        int idx2 = rand() % net->ninputs;
+        char *temp = current_order[idx1];
+        current_order[idx1] = current_order[idx2];
+        current_order[idx2] = temp;
+
+        /* Read network with new input order */
+        if ((fp = fopen(option->file1, "r")) == NULL) {
+            fprintf(stderr, "\nCannot open file %s.\n", blif_file);
+            exit(-2);
+        }
+        BnetNetwork *new_net = Bnet_ReadNetwork(fp, pr);
+        fclose(fp);
+
+        new_net->inputs = current_order;
+
+        manager = startCudd(option, new_net->ninputs);
+        if (!manager) exit(-1);
+
+        if (!Ntr_buildDDs(new_net, manager, option, NULL)) {
+            fprintf(stderr, "Cannot build DD from the BNetwork\n");
+            exit(-1);
+        }
+
+        if (option->ordering != PI_PS_GIVEN) {
+            DynamicReordering(manager);
+        }
+
+        int new_size = Cudd_ReadNodeCount(manager);
+        fprintf(stdout, "size: %8d\n", new_size);
+        /* Decide whether to accept the new state */
+        double acceptance_prob = exp((best_size - new_size) / temperature);
+        if (new_size < best_size || ((double)rand() / RAND_MAX) < acceptance_prob) {
+            best_size = new_size;
+            for (int i = 0; i < net->ninputs; i++) {
+                best_order[i] = current_order[i];
+            }
+        } else {
+            /* Revert the swap */
+            temp = current_order[idx1];
+            current_order[idx1] = current_order[idx2];
+            current_order[idx2] = temp;
+        }
+
+        Cudd_Quit(manager);
+
+        /* Cool down */
+        temperature *= COOLING_RATE;
+    }
+		fprintf(stdout, "Original order size: %8d\n", Orisize);
+		fprintf(stdout, "Best order size: %8d\n", best_size);	
+		fprintf(stdout, "Best order:\n");
+        for (int i = 0; i < net->ninputs; i++) {
+            fprintf(stdout, "\t%s\n", best_order[i]);
+        }
+        //TODO delete
+		//(void) fclose (fp);
+
+
+        // Bnet_bddDump (manager, net, string1, 0, 0);
+
+
+        //(void) Cudd_Quit (manager);
+    
 
 	(void) Bnet_FreeNetwork (net);
-	(void) Cudd_Quit (manager);
+
+
+
+	// fprintf (stdout, "\nOrdering before the DFS re-ordering.\n");
+	// //   Bnet_PrintOrder( net, manager);
+	// //  Bnet_DfsVariableOrder( manager, net);
+	// // Bnet_PrintOrder( net, manager);
+	// //Bnet_bddDump( manager, net, "dump1.dot", 0, 0);
+
+	// /* Read ordering from file */
+	// //   Bnet_ReadOrder( manager, "s27.ord", net, 1, 1); // 0: which kind of bdd 1:
+	// strcat(string1, "");
+	// strcat(string1, blif_file);
+	// //fprintf (stdout,string1);
+	// string1[strlen(string1)-1] = '\0'; // = '\0' only removes one char
+	// string1[strlen(string1)-1] = '\0'; // = 0 removes 2 chars
+	// string1[strlen(string1)-1] = '\0'; // the string length will change 
+	// string1[strlen(string1)-1] = '\0'; 
+	// string1[strlen(string1)-1] = '\0';
+
+	// strcat(string1, ".add.dot");
+	// //strcat(string1, ".dot");
+	
+	
 
 	/* print running statistics */
 	/* (void) printf("total time = %s\n",

@@ -9,6 +9,10 @@
 # Modified by Cunxi Yu
 # 2021
 
+# By Hung-Yu Yeh
+# 2024
+# Please follow the original step and preceed to blif2bdd to get the midification
+
 #
 # automatic form
 #------------------------------------------------------------------------

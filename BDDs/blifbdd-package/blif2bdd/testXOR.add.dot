@@ -10,23 +10,23 @@ edge [dir = none];
 { rank = same; node [shape = box]; edge [style = invis];
 "  m0  " -> "  m1  "; }
 { rank = same; " a0 ";
-"0x4a" [label="a0"];
-"0x49" [label="a0"];
+"0x9" [label="a0"];
+"0x8" [label="a0"];
 }
 { rank = same; " b0 ";
-"0x48" [label="b0"];
+"0x7" [label="b0"];
 }
 { rank = same; "CONST NODES";
-{ node [shape = box]; "0x43";
+{ node [shape = box]; "0x2";
 }
 }
-"  m0  " -> "0x49" [style = dotted];
-"  m1  " -> "0x4a" [style = solid];
-"0x4a" -> "0x48";
-"0x4a" -> "0x43" [style = dotted];
-"0x49" -> "0x48";
-"0x49" -> "0x48" [style = dotted];
-"0x48" -> "0x43";
-"0x48" -> "0x43" [style = dotted];
-"0x43" [label = "1"];
+"  m0  " -> "0x8" [style = dotted];
+"  m1  " -> "0x9" [style = solid];
+"0x9" -> "0x7";
+"0x9" -> "0x2" [style = dotted];
+"0x8" -> "0x7";
+"0x8" -> "0x7" [style = dotted];
+"0x7" -> "0x2";
+"0x7" -> "0x2" [style = dotted];
+"0x2" [label = "1"];
 }
